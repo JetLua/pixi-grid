@@ -6,14 +6,18 @@ interface Opts {
   justifyContent?: 'center' | 'start' | 'end' | 'stretch'
   /** 几列 */
   col?: number
+  anchor?: PIXI.IPointData
 }
 
 const wm = new WeakMap<object, number>()
+const twm = new WeakMap<object, number>()
 const confs = new WeakMap<object, Pick<Opts, 'alignItems' | 'justifyContent'>>()
 
 export default class extends PIXI.Container {
   private opts: Omit<Required<Opts>, 'gap'> & {gap: [number, number]}
-  private pos = new PIXI.Point()
+  private r = new PIXI.Rectangle()
+  private cacheID = -1
+  private tidyID = -1
 
   constructor(opts?: Opts) {
     super()
@@ -22,6 +26,7 @@ export default class extends PIXI.Container {
     opts.alignItems ??= 'center'
     opts.justifyContent ??= 'center'
     opts.gap ??= 0
+    opts.anchor ??= {x: .5, y: .5}
 
     if (!Array.isArray(opts.gap)) opts.gap = [opts.gap, opts.gap]
 
@@ -40,26 +45,23 @@ export default class extends PIXI.Container {
     this.tidy()
   }
 
-
   render(renderer: PIXI.Renderer): void {
     super.render(renderer)
 
-    const ok = this.check(this.children)
+    const ok = this.check(this.children as PIXI.Container[])
 
     if (ok) this.tidy()
+    else this.tidyID = -1
+
+    if (this.tidyID !== this.cacheID) this.updateCache(this.children as PIXI.Container[])
   }
 
   tidy() {
-    const r = new PIXI.Rectangle()
-    const {opts: {gap, col}, pos} = this
-    const children = this.children.filter(c => c.visible)
+    const {opts: {gap, col}, r} = this
+    const children = this.children.filter(c => c.visible) as PIXI.Container[]
 
     let {opts: {justifyContent, alignItems}} = this
 
-    this.toGlobal({x: 0, y: 0}, this.pos)
-
-    const px = pos.x
-    const py = pos.y
 
     /** 行高合集 */
     const rows = [] as number[]
@@ -92,128 +94,129 @@ export default class extends PIXI.Container {
       const h = _justifyContent !== 'stretch'
       const v = _alignItems !== 'stretch'
 
-      c.getBounds(false, r)
-      if (h && r.width > cols[x]) cols[x] = r.width
-      if (v && r.height > rows[y]) rows[y] = r.height
+      c.getLocalBounds(r, false)
+
+      // if (c.name === 'circle') console.log(r, c.scale.x)
+
+      const width = r.width * c.scale.x
+      const height = r.height * c.scale.y
+
+      if (h && width > cols[x]) cols[x] = width
+      if (v && height > rows[y]) rows[y] = height
       if (h && v) _wm.set(c, r.clone())
 
-      if (r.width > _cols[x]) _cols[x] = r.width
-      if (r.height > _rows[y]) _rows[y] = r.height
+      if (width > _cols[x]) _cols[x] = width
+      if (height > _rows[y]) _rows[y] = height
     }
 
     for (let i = 0; i < children.length; i++) {
+      const c = children[i]
       const x = i % col
       const y = i / col | 0
-      const c = children[i]
-      const bound = _wm.get(c) ?? c.getBounds(false, r)
+      const bound = _wm.get(c) ?? c.getLocalBounds(r, false)
+      const {scale: {x: sx, y: sy}} = c
+
+      bound.x *= sx
+      bound.width *= sx
+      bound.y *= sy
+      bound.height *= sy
 
       const w = cols[x] || _cols[x]
       const h = rows[y] || _rows[y]
 
-      // console.log(i, w)
-
-      /** 目标位置x */
-      let tx = px
+      let tx = 0
       for (let i = 0; i < x; i++) {
-        tx += (cols[i] || _cols[i]) + gap[0]
+        tx += cols[i] + gap[0]
       }
 
-      /** 目标位置y */
-      let ty = py
+      let ty = 0
       for (let i = 0; i < y; i++) {
-        ty += (rows[i] || _rows[i]) + gap[1]
+        ty += rows[i] + gap[1]
       }
 
-      let sx = 0
       const conf = confs.get(c)
       const _justifyContent = conf?.justifyContent || justifyContent
 
       switch (_justifyContent) {
-        case 'center': {
-          tx += w / 2
-          sx = bound.x + bound.width / 2
-          break
-        }
-
-        case 'end': {
-          tx += w
-          sx = bound.x + bound.width
-          break
-        }
-
         case 'start': {
-          sx = bound.x
+          tx -= bound.x
           break
         }
-
+        case 'center': {
+          tx += cols[x] * .5
+          tx -= bound.width / 2 + bound.x
+          break
+        }
+        case 'end': {
+          tx += cols[x]
+          tx -= bound.width + bound.x
+          break
+        }
         case 'stretch': {
-          // @ts-expect-error
           c.width = w
-          tx += w / 2
-          sx = bound.x + bound.width / 2
+          tx -= bound.x
           break
         }
       }
 
-      let sy = 0
       const _alignItems = conf?.alignItems || alignItems
 
       switch (_alignItems) {
+        case 'start': {
+          ty -= bound.y
+          break
+        }
         case 'center': {
-          ty += h / 2
-          sy = bound.y + bound.height / 2
+          ty += rows[y] * .5
+          ty -= bound.height / 2 + bound.y
           break
         }
 
         case 'end': {
-          ty += h
-          sy = bound.y + bound.height
-          break
-        }
-
-        case 'start': {
-          sy = bound.y
+          ty += rows[y]
+          ty -= bound.height + bound.y
           break
         }
 
         case 'stretch': {
-          // @ts-expect-error
           c.height = h
-          ty += h / 2
-          sy = bound.y + bound.height / 2
+          ty -= bound.y
           break
         }
       }
 
-      c.x += tx - sx
-      c.y += ty - sy
+      c.position.set(tx, ty)
     }
 
-
-    // 更新完成
-    this.updateCache(this.children)
+    this.tidyID++
   }
 
-  private updateCache(children: PIXI.DisplayObject[]) {
-    if (!this.children) return
+  private updateCache(children: PIXI.Container[]) {
+    this.cacheID = this.tidyID
+
+    if (!children || !children.length) return
 
     for (const c of children) {
       wm.set(c, c.transform._worldID)
-      if ('children' in c) this.updateCache(c.children as PIXI.DisplayObject[])
+      if ('_textureID' in c) twm.set(c, c._textureID as number)
+      if (c.children && c.children.length) this.updateCache(c.children as PIXI.Container[])
     }
   }
 
   /** 是否需要重排: true: 需要 */
-  private check(children: PIXI.DisplayObject[]): boolean {
-    if (!children) return false
+  private check(children: PIXI.Container[]): boolean {
+    if (!children || !children.length) return false
 
     for (const c of children) {
       const old = wm.get(c)
+      const tid = twm.get(c)
+
       if (old == null) return true
       if (c.transform._worldID !== old) return true
+      if ('_textureID' in c && c._textureID !== tid) return true
 
-      if ('children' in c) {
-        const ok = this.check(c.children as PIXI.DisplayObject[])
+      if ('children' in c && c.children.length) {
+        const ok = this.check(c.children as PIXI.Container[])
         if (ok) return true
       }
     }
