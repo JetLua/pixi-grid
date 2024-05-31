@@ -62,7 +62,6 @@ export default class extends PIXI.Container {
 
     let {opts: {justifyContent, alignItems}} = this
 
-
     /** 行高合集 */
     const rows = [] as number[]
     /** 行高合集副本 */
@@ -124,12 +123,12 @@ export default class extends PIXI.Container {
       const w = cols[x] || _cols[x]
       const h = rows[y] || _rows[y]
 
-      let tx = 0
+      let tx = c.pivot.x * sx
       for (let i = 0; i < x; i++) {
         tx += cols[i] + gap[0]
       }
 
-      let ty = 0
+      let ty = c.pivot.y * sy
       for (let i = 0; i < y; i++) {
         ty += rows[i] + gap[1]
       }
