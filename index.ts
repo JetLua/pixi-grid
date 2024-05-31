@@ -26,7 +26,7 @@ export default class extends PIXI.Container {
     opts.alignItems ??= 'center'
     opts.justifyContent ??= 'center'
     opts.gap ??= 0
-    opts.anchor ??= {x: .5, y: .5}
+    opts.anchor ??= {x: 0, y: 0}
 
     if (!Array.isArray(opts.gap)) opts.gap = [opts.gap, opts.gap]
 
@@ -57,7 +57,7 @@ export default class extends PIXI.Container {
   }
 
   tidy() {
-    const {opts: {gap, col}, r} = this
+    const {opts: {gap, col, anchor}, r} = this
     const children = this.children.filter(c => c.visible) as PIXI.Container[]
 
     let {opts: {justifyContent, alignItems}} = this
@@ -187,6 +187,10 @@ export default class extends PIXI.Container {
 
       c.position.set(tx, ty)
     }
+
+    this.getLocalBounds(r, false)
+
+    this.pivot.set(r.width * anchor.x, r.height * anchor.y)
 
     this.tidyID++
   }
