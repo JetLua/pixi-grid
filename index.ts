@@ -95,8 +95,6 @@ export default class extends PIXI.Container {
 
       c.getLocalBounds(r, false)
 
-      // if (c.name === 'circle') console.log(r, c.scale.x)
-
       const width = r.width * c.scale.x
       const height = r.height * c.scale.y
 
@@ -189,7 +187,12 @@ export default class extends PIXI.Container {
 
     this.getLocalBounds(r, false)
 
-    this.pivot.set(r.width * anchor.x, r.height * anchor.y)
+    this.pivot.set(
+      r.width * anchor.x + r.x,
+      r.height * anchor.y + r.y
+    )
+
+    this.getBounds(false, r)
 
     this.tidyID++
   }
