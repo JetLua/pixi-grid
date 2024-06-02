@@ -9,8 +9,15 @@ interface Opts {
   anchor?: PIXI.IPointData
 }
 
+/** transformID */
 const wm = new WeakMap<object, number>()
+/** texture */
 const twm = new WeakMap<object, number>()
+/** visible */
+const vwm = new WeakMap<object, boolean>()
+/** tidyID */
+const tdwm = new WeakMap<object, number>()
+
 const confs = new WeakMap<object, Pick<Opts, 'alignItems' | 'justifyContent'>>()
 
 export default class extends PIXI.Container {
@@ -204,6 +211,8 @@ export default class extends PIXI.Container {
 
     for (const c of children) {
       wm.set(c, c.transform._worldID)
+      vwm.set(c, c.visible)
+      if ('tidyID' in c) tdwm.set(c, c.tidyID as number)
       if ('_textureID' in c) twm.set(c, c._textureID as number)
       if (c.children && c.children.length) this.updateCache(c.children as PIXI.Container[])
     }
@@ -215,13 +224,21 @@ export default class extends PIXI.Container {
 
     for (const c of children) {
       const old = wm.get(c)
-      const tid = twm.get(c)
-
       if (old == null) return true
       if (c.transform._worldID !== old) return true
-      if ('_textureID' in c && c._textureID !== tid) return true
 
-      if ('children' in c && c.children.length) {
+      const vold = vwm.get(c)
+      if (vold !== c.visible) return true
+
+      if ('_textureID' in c) {
+        if (twm.get(c) !== c._textureID) return true
+      }
+
+      if ('tidyID' in c) {
+        if (tdwm.get(c) !== c.tidyID && c.tidyID !== -1) return true
+      }
+
+      if ('children' in c && c.children?.length) {
         const ok = this.check(c.children as PIXI.Container[])
         if (ok) return true
       }
