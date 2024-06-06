@@ -5,7 +5,7 @@ interface Opts {
   alignItems?: 'center' | 'stretch' | 'start' | 'end'
   justifyContent?: 'center' | 'start' | 'end' | 'stretch'
   /** 几列 */
-  col?: number
+  col?: number | 'auto'
   anchor?: PIXI.IPointData
 }
 
@@ -64,7 +64,7 @@ export default class extends PIXI.Container {
   }
 
   tidy() {
-    const {opts: {gap, col, anchor}, r} = this
+    const {opts: {gap, col: _col, anchor}, r} = this
     const children = this.children.filter(c => c.visible) as PIXI.Container[]
 
     let {opts: {justifyContent, alignItems}} = this
@@ -80,6 +80,8 @@ export default class extends PIXI.Container {
 
 
     const _wm = new WeakMap<object, PIXI.Rectangle>()
+
+    const col = _col === 'auto' ? children.length : _col
 
     for (let i = 0; i < children.length; i++) {
       const x = i % col
