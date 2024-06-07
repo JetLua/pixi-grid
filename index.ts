@@ -65,7 +65,7 @@ export default class extends PIXI.Container {
 
   tidy() {
     const {opts: {gap, col: _col, anchor}, r} = this
-    const children = this.children.filter(c => c.visible) as PIXI.Container[]
+    const children = this.children.filter(c => c.visible && !c.isMask) as PIXI.Container[]
 
     let {opts: {justifyContent, alignItems}} = this
 
@@ -88,7 +88,6 @@ export default class extends PIXI.Container {
       const y = i / col | 0
       const c = children[i]
 
-
       cols[x] ??= 0
       _cols[x] ??= 0
       rows[y] ??= 0
@@ -97,7 +96,6 @@ export default class extends PIXI.Container {
       const conf = confs.get(c)
       const _justifyContent = conf?.justifyContent || justifyContent
       const _alignItems = conf?.alignItems || alignItems
-
 
       const h = _justifyContent !== 'stretch'
       const v = _alignItems !== 'stretch'
